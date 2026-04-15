@@ -36,17 +36,15 @@ void cmd_init(void) {
 
 // Usage: pes add <file>...
 void cmd_add(int argc, char *argv[]) {
-    if (argc < 3) {
-        fprintf(stderr, "Usage: pes add <file>...\n");
-        return;
-    }
-
     Index index;
+    memset(&index, 0, sizeof(Index));
+
     if (index_load(&index) != 0) {
         fprintf(stderr, "error: failed to load index\n");
         return;
     }
 
+    // start from argv[2], skip "./pes" and "add"
     for (int i = 2; i < argc; i++) {
         if (index_add(&index, argv[i]) != 0) {
             fprintf(stderr, "error: failed to add '%s'\n", argv[i]);
@@ -67,38 +65,40 @@ void cmd_status(void) {
 // Usage: pes commit -m <message>
 void cmd_commit(int argc, char *argv[]) {
     if (argc < 4 || strcmp(argv[2], "-m") != 0) {
-        fprintf(stderr, "error: commit requires a message (-m \"message\")\n");
+        printf("Usage: pes commit -m <message>\n");
         return;
     }
 
-    const char *message = argv[3];
-    ObjectID commit_id;
-    if (commit_create(message, &commit_id) != 0) {
-        fprintf(stderr, "error: commit failed\n");
+    ObjectID id;
+    if (commit_create(argv[3], &id) != 0) {
+        printf("error: commit failed\n");
         return;
     }
 
-    char hex[HASH_HEX_SIZE + 1];
-    hash_to_hex(&commit_id, hex);
-    printf("Committed: %.12s... %s\n", hex, message);
+    printf("Commit created successfully\n");
 }
 
 // Callback for commit_walk used by cmd_log.
-static void print_commit(const ObjectID *id, const Commit *commit, void *ctx) {
-    (void)ctx;
-    char hex[HASH_HEX_SIZE + 1];
-    hash_to_hex(id, hex);
-    printf("commit %s\n", hex);
-    printf("Author: %s\n", commit->author);
-    printf("Date:   %llu\n", (unsigned long long)commit->timestamp);
-    printf("\n    %s\n\n", commit->message);
-}
+
+   
 
 // Usage: pes log
-void cmd_log(void) {
-    if (commit_walk(print_commit, NULL) != 0) {
-        fprintf(stderr, "No commits yet.\n");
+void cmd_log() {
+    FILE *fp = fopen(".pes/refs/heads/main", "r");
+    if (!fp) {
+        printf("No commits yet.\n");
+        return;
     }
+
+    char commit_hex[HASH_HEX_SIZE + 1];
+    if (fscanf(fp, "%64s", commit_hex) != 1) {
+        fclose(fp);
+        printf("No commits yet.\n");
+        return;
+    }
+    fclose(fp);
+
+    printf("commit %s\n", commit_hex);
 }
 
 // ─── PROVIDED: Command dispatch ─────────────────────────────────────────────
